@@ -1,6 +1,8 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_firebase_auth/cloud_firestore.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -15,21 +17,23 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-        title: 'Firebase Authentication',
-        theme: ThemeData(
-          primarySwatch: Colors.green,
-        ),
-        home: FutureBuilder(
-            future: _initialization,
-            builder: (context, snapshot) {
-              if (snapshot.hasError) {
-                return const Center(child: Text('Unexpected Error'));
-              } else if (snapshot.hasData) {
-                return const MyHomePage(title: 'Firebase Authentication');
-              } else {
-                return const CircularProgressIndicator();
-              }
-            }));
+      title: 'Firebase Authentication',
+      theme: ThemeData(
+        primarySwatch: Colors.green,
+      ),
+      home: //CloudFiretore(),
+          FutureBuilder(
+              future: _initialization,
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return const Center(child: Text('Unexpected Error'));
+                } else if (snapshot.hasData) {
+                  return const MyHomePage(title: 'Firebase Authentication');
+                } else {
+                  return const CircularProgressIndicator();
+                }
+              }),
+    );
   }
 }
 
@@ -111,10 +115,45 @@ class _MyHomePageState extends State<MyHomePage> {
               },
               child: const Text('Change Email'),
             ),
+            ElevatedButton(
+              onPressed: () {
+                loginWithGmail();
+              },
+              child: const Text('Login with Gmail'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                loginWithPhoneNumber();
+              },
+              child: const Text('Login with Phone'),
+            ),
           ],
         ),
       ),
     );
+  }
+
+  void loginWithPhoneNumber() async {
+    await FirebaseAuth.instance.verifyPhoneNumber(
+        phoneNumber: '+90 555 555 55 55	',
+        verificationCompleted: (PhoneAuthCredential credential) async {
+          debugPrint(credential.toString());
+          debugPrint('Phone Verification Completed');
+          await auth.signInWithCredential(credential);
+        },
+        verificationFailed: (FirebaseAuthException e) {
+          debugPrint(e.toString());
+        },
+        codeSent: (String verificationId, int? resendToken) async {
+          String _smsCode = "123456";
+          debugPrint('code received');
+          var _credential = PhoneAuthProvider.credential(
+              verificationId: verificationId, smsCode: _smsCode);
+          await auth.signInWithCredential(_credential);
+        },
+        codeAutoRetrievalTimeout: (String verificationId) {
+          debugPrint('Code Auto Retrieval Timeout');
+        });
   }
 
   void createUserEmailandPassword() async {
@@ -147,6 +186,10 @@ class _MyHomePageState extends State<MyHomePage> {
 
   void signOutUser() async {
     await auth.signOut();
+    var _user = GoogleSignIn().currentUser;
+    if (_user != null) {
+      await GoogleSignIn().signOut();
+    }
   }
 
   void deleteUser() async {
@@ -193,5 +236,18 @@ class _MyHomePageState extends State<MyHomePage> {
     } catch (e) {
       debugPrint(e.toString());
     }
+  }
+
+  void loginWithGmail() async {
+    final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
+
+    final GoogleSignInAuthentication? googleAuth =
+        await googleUser?.authentication;
+
+    final credential = GoogleAuthProvider.credential(
+      accessToken: googleAuth?.accessToken,
+      idToken: googleAuth?.idToken,
+    );
+    await FirebaseAuth.instance.signInWithCredential(credential);
   }
 }
